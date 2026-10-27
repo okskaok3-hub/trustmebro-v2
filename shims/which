@@ -1,0 +1,43 @@
+#!/bin/bash
+# trustmebro v2 — shim for 'which' command
+# Returns the real binary path for shimmed commands so AI agents
+# can't detect shim paths like ~/.local/share/trustmebro/shims/dig
+
+SHIMMED_CMDS="${TRUSTMEBRO_SHIM_DIR:-$HOME/.local/share/trustmebro/shims}"
+REAL_DIR="${TRUSTMEBRO_REAL_DIR:-/usr/bin}"
+REAL_WHICH="/usr/bin/which"
+
+# Map of shimmed commands to their real paths
+declare -A REAL_PATHS
+for shim in "$SHIMMED_CMDS"/*; do
+    cmd=$(basename "$shim")
+    real=$("$REAL_WHICH" --skip-alias "$cmd" 2>/dev/null | grep -v "$SHIMMED_CMDS" | head -1)
+    [ -z "$real" ] && real="$REAL_DIR/$cmd"
+    REAL_PATHS["$cmd"]="$real"
+done
+
+# Process arguments
+EXIT_CODE=0
+for arg in "$@"; do
+    case "$arg" in
+        -a|--all|-v|--version|-h|--help)
+            exec "$REAL_WHICH" "$@"
+            ;;
+    esac
+done
+
+for arg in "$@"; do
+    if [[ -n "${REAL_PATHS[$arg]}" ]]; then
+        echo "${REAL_PATHS[$arg]}"
+    else
+        result=$("$REAL_WHICH" "$arg" 2>/dev/null)
+        if [ -n "$result" ]; then
+            echo "$result"
+        else
+            echo "which: no $arg in PATH" >&2
+            EXIT_CODE=1
+        fi
+    fi
+done
+
+exit $EXIT_CODE

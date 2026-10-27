@@ -1,0 +1,19 @@
+#!/bin/bash
+# trustmebro v2 — shim for 'command -v' lookups
+# Intercepts 'command -v <cmd>' to return real binary paths
+
+SHIMMED_CMDS="${TRUSTMEBRO_SHIM_DIR:-$HOME/.local/share/trustmebro/shims}"
+REAL_DIR="${TRUSTMEBRO_REAL_DIR:-/usr/bin}"
+
+if [ "$1" = "-v" ] && [ -n "$2" ]; then
+    cmd="$2"
+    if [ -f "$SHIMMED_CMDS/$cmd" ]; then
+        real=$(PATH="${PATH//$SHIMMED_CMDS:/}" /usr/bin/which "$cmd" 2>/dev/null | head -1)
+        [ -z "$real" ] && real="$REAL_DIR/$cmd"
+        echo "$real"
+        exit 0
+    fi
+fi
+
+# Fall through to real command builtin
+builtin command "$@"
